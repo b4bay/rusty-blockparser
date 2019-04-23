@@ -124,16 +124,6 @@ You can also define custom callbacks. A callback gets called at startup, on each
 This tool runs on Windows, OS X and Linux.
 All you need is `rust` and `cargo`.
 
-
-### Latest Release
-
-You can download the latest release from crates.io:
-```bash
-cargo install rusty-blockparser
-```
-Be sure to add `~/.cargo/bin` to your PATH.
-
-
 ### Build from source
 
 ```bash
