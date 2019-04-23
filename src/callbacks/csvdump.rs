@@ -112,7 +112,7 @@ impl Callback for CsvDump {
         for f in vec!["blocks", "transactions", "tx_in", "tx_out"] {
             // Rename temp files
             fs::rename(self.dump_folder.as_path().join(format!("{}.csv.tmp", f)),
-                       self.dump_folder.as_path().join(format!("{}-{}-{}.csv", f, self.start_height, self.end_height)))
+                       self.dump_folder.as_path().join(format!("{}.csv", f)))
                 .expect("Unable to rename tmp file!");
         }
 
@@ -144,12 +144,14 @@ impl Block {
 impl Hashed<Tx> {
     #[inline]
     fn as_csv(&self, block_hash: &str) -> String {
-        // (@txid, @hashBlock, version, lockTime)
-        format!("{};{};{};{}\n",
+        // (@txid, @hashBlock, version, lockTime, in_count, out_count)
+        format!("{};{};{};{};{};{}\n",
             &utils::arr_to_hex_swapped(&self.hash),
             &block_hash,
             &self.value.tx_version,
-            &self.value.tx_locktime)
+            &self.value.tx_locktime,
+            &self.value.in_count,
+            &self.value.out_count)
     }
 }
 

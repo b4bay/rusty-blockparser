@@ -43,7 +43,7 @@ Lets call it ParseModes:
     ```
     ```
     transactions.csv
-    txid ; hashBlock ; version ; lockTime
+    txid ; hashBlock ; version ; lockTime; in_count; out_count
     ```
     ```
     tx_in.csv

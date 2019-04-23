@@ -61,6 +61,13 @@ pub enum ScriptPattern {
     /// Signature script: <sig>[sig][sig...] <redeemScript>
     Pay2ScriptHash,
 
+    /// Namecoin support
+    NamecoinNameNew,
+
+    NamecoinNameFirstUpdate,
+
+    NamecoinNameUpdate,
+
     /// Sign Multisig script [BIP11]
     //SignMultiSig,
 
@@ -89,6 +96,9 @@ impl fmt::Display for ScriptPattern {
             ScriptPattern::Pay2PublicKey => write!(f, "Pay2PublicKey"),
             ScriptPattern::Pay2PublicKeyHash => write!(f, "Pay2PublicKeyHash"),
             ScriptPattern::Pay2ScriptHash => write!(f, "Pay2ScriptHash"),
+            ScriptPattern::NamecoinNameNew => write!(f, "NamecoinNameNew"),
+            ScriptPattern::NamecoinNameFirstUpdate => write!(f, "NamecoinNameFirstUpdate"),
+            ScriptPattern::NamecoinNameUpdate => write!(f, "NamecoinNameUpdate"),
             ScriptPattern::NotRecognised => write!(f, "NotRecognised"),
             ScriptPattern::Error(ref err) => write!(f, "ScriptError: {}", err)
         }
@@ -277,6 +287,50 @@ impl<'a> ScriptEvaluator<'a> {
             return ScriptPattern::Pay2ScriptHash;
         }
 
+        // Namecoin NAME_NEW
+        let nc_new = [  StackElement::Op(opcodes::All::OP_PUSHNUM_1),
+                        StackElement::Data(Vec::new()),
+                        StackElement::Op(opcodes::All::OP_2DROP),
+                        StackElement::Op(opcodes::All::OP_DUP),
+                        StackElement::Op(opcodes::All::OP_HASH160),
+                        StackElement::Data(Vec::new()),
+                        StackElement::Op(opcodes::All::OP_EQUALVERIFY),
+                        StackElement::Op(opcodes::All::OP_CHECKSIG)];
+        if ScriptEvaluator::match_stack_pattern(&elements, &nc_new) {
+            return ScriptPattern::NamecoinNameNew;
+        }
+
+        // Namecoin NAME_FIRSTUPDATE
+        let nc_fupdate = [  StackElement::Op(opcodes::All::OP_PUSHNUM_2),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Op(opcodes::All::OP_2DROP),
+                            StackElement::Op(opcodes::All::OP_2DROP),
+                            StackElement::Op(opcodes::All::OP_DUP),
+                            StackElement::Op(opcodes::All::OP_HASH160),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Op(opcodes::All::OP_EQUALVERIFY),
+                            StackElement::Op(opcodes::All::OP_CHECKSIG)];
+        if ScriptEvaluator::match_stack_pattern(&elements, &nc_fupdate) {
+            return ScriptPattern::NamecoinNameFirstUpdate;
+        }
+
+         // Namecoin NAME_UPDATE
+        let nc_update = [   StackElement::Op(opcodes::All::OP_PUSHNUM_3),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Op(opcodes::All::OP_2DROP),
+                            StackElement::Op(opcodes::All::OP_DROP),
+                            StackElement::Op(opcodes::All::OP_DUP),
+                            StackElement::Op(opcodes::All::OP_HASH160),
+                            StackElement::Data(Vec::new()),
+                            StackElement::Op(opcodes::All::OP_EQUALVERIFY),
+                            StackElement::Op(opcodes::All::OP_CHECKSIG)];
+        if ScriptEvaluator::match_stack_pattern(&elements, &nc_update) {
+            return ScriptPattern::NamecoinNameUpdate;
+        }
+
         // Data output
         // pubkey: OP_RETURN <0 to 40 bytes of data>
         let data_output = [StackElement::Op(opcodes::All::OP_RETURN),
@@ -377,6 +431,31 @@ pub fn eval_from_stack(stack: Stack, version_id: u8) -> EvaluatedScript {
                     pattern: p.clone()
                 }
             }
+            // Namecoin support
+            ref p @ ScriptPattern::NamecoinNameNew => {
+                let h160 = try!(stack.elements[5].data());
+                EvaluatedScript {
+                    address: hash_160_to_address(&h160, version_id),
+                    pattern: p.clone()
+                }
+            }
+
+            ref p @ ScriptPattern::NamecoinNameFirstUpdate => {
+                let h160 = try!(stack.elements[8].data());
+                EvaluatedScript {
+                    address: hash_160_to_address(&h160, version_id),
+                    pattern: p.clone()
+                }
+            }
+
+            ref p @ ScriptPattern::NamecoinNameUpdate => {
+                let h160 = try!(stack.elements[7].data());
+                EvaluatedScript {
+                    address: hash_160_to_address(&h160, version_id),
+                    pattern: p.clone()
+                }
+            }
+
             ScriptPattern::DataOutput(ref data) => {
                 EvaluatedScript {
                     address: String::new(),

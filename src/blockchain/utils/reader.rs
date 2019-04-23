@@ -30,8 +30,14 @@ pub trait BlockchainRead: io::Read {
                   blk_offset: usize,
                   blocksize: u32,
                   version_id: u8) -> OpResult<Block> {
+
         let header = try!(self.read_block_header());
-        let tx_count = try!(VarUint::read_from(self));
+        if header.version >= 65793 {
+            let _coinbase_txn = try!(self.read_txs(0x01 as u64, version_id));
+            let _aux_pow = try!(self.skip_aux_pow());
+        };
+        let tx_count: VarUint;
+        tx_count = try!(VarUint::read_from(self));
         let txs = try!(self.read_txs(tx_count.value, version_id));
         Ok(Block::new(blk_index, blk_offset, blocksize, header, tx_count, txs))
     }
@@ -49,25 +55,30 @@ pub trait BlockchainRead: io::Read {
     fn read_txs(&mut self, tx_count: u64, version_id: u8) -> OpResult<Vec<Tx>> {
         let mut txs: Vec<Tx> = Vec::with_capacity(tx_count as usize);
         for _ in 0..tx_count {
-            let tx_version = try!(self.read_u32::<LittleEndian>());
-            let marker = try!(self.read_u8());
             let in_count: VarUint;
-            if marker == 0x00 {
-                // SegWit hack
-                /*let flag = */try!(self.read_u8());
-                in_count = try!(VarUint::read_from(self));
+            let tx_version: u32;
+            let tmp_tx_version: u32;
+            tmp_tx_version = try!(self.read_u32::<LittleEndian>());
+            if tmp_tx_version == 16777216 {
+                in_count = VarUint::from(0x01 as u8);
+                tx_version = 0x01 as u32;                
             } else {
+                tx_version = tmp_tx_version;
+                let marker = try!(self.read_u8());
                 in_count = match marker {
-                    0x01...0xfc => VarUint::from(marker),
+                    0x00...0xfc => VarUint::from(marker),
                     0xfd => VarUint::from(try!(self.read_u16::<LittleEndian>())),
                     0xfe => VarUint::from(try!(self.read_u32::<LittleEndian>())),
                     0xff => VarUint::from(try!(self.read_u64::<LittleEndian>())),
                     _ => return Err(OpError::new(OpErrorKind::RuntimeError).join_msg("Invalid VarUint value")),
                 };
             }
+
             let inputs = try!(self.read_tx_inputs(in_count.value));
             let out_count = try!(VarUint::read_from(self));
             let outputs = try!(self.read_tx_outputs(out_count.value));
+            
+            /*
             if marker == 0x00 {
                 // SegWit hack
                 for _ in 0..in_count.value {
@@ -78,6 +89,8 @@ pub trait BlockchainRead: io::Read {
                     }
                 }
             }
+            */
+            
             let tx_locktime = try!(self.read_u32::<LittleEndian>());
             let tx = Tx::new(tx_version,
                              in_count, &inputs,
@@ -131,6 +144,28 @@ pub trait BlockchainRead: io::Read {
             outputs.push(output);
         }
         Ok(outputs)
+    }
+
+    // Stub for auxiliary proof-of-work block
+    // https://en.bitcoin.it/wiki/Merged_mining_specification
+    fn skip_aux_pow(&mut self) -> OpResult<bool> {
+        let _parent_block = try!(self.read_256hash());
+        let _coinbase_branch = try!(self.skip_merkle_branch());
+        let _blockchain_branch = try!(self.skip_merkle_branch());
+        let _parent_block_header = try!(self.read_block_header());
+
+        Ok(true)
+    }
+
+    fn skip_merkle_branch(&mut self) -> OpResult<bool> {
+        let mut _tmp_sha256 = [0u8; 32];
+        let _branch_size = try!(VarUint::read_from(self));
+        for _ in 0.._branch_size.value {
+            _tmp_sha256 = try!(self.read_256hash());
+        };
+        let _branch_side_mask = try!(self.read_u32::<LittleEndian>());
+        
+        Ok(true)
     }
 }
 
