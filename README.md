@@ -127,7 +127,7 @@ All you need is `rust` and `cargo`.
 ### Build from source
 
 ```bash
-git clone https://github.com/gcarq/rusty-blockparser.git
+git clone https://github.com/b4bay/rusty-blockparser.git
 cd rusty-blockparser
 cargo build --release
 cargo test --release
